@@ -1,14 +1,12 @@
 import streamlit as st
 from supabase import create_client
 
-# --- Supabase Setup ---
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
 supabase = create_client(url, key)
 
-st.title("📡 Company Monitoring Dashboard (Supabase Edition)")
+st.title("📡 Company Monitoring Dashboard")
 
-# --- Company Management ---
 st.header("🛠️ Manage Companies")
 
 def load_companies():
@@ -39,14 +37,12 @@ with st.form("Add Company"):
         save_company(name, {"blog": blog, "team": team, "products": products})
         st.success(f"Saved {name}!")
 
-# Display companies
 st.subheader("Companies Being Monitored")
 for company, sections in companies.items():
     st.write(f"### {company}")
     for section, url in sections.items():
         st.write(f"- **{section}**: {url}")
 
-# --- Subscriber Management ---
 st.header("📬 Subscriber List")
 
 def load_subscribers():
