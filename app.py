@@ -36,7 +36,18 @@ with st.form("Add/Update Company"):
         save_config(config)
         st.success(f"✅ Saved config for {company_name}")
 
-# Display current config
+# Display and allow removal of companies
+st.subheader("🗑️ Remove Company From Monitoring")
+if config:
+    company_to_remove = st.selectbox("Select a company to remove", [""] + list(config.keys()))
+    if st.button("Remove Selected Company") and company_to_remove:
+        del config[company_to_remove]
+        save_config(config)
+        st.success(f"🗑️ Removed {company_to_remove} from configuration.")
+else:
+    st.info("No companies configured yet.")
+
+# Show current config
 st.subheader("📘 Current Companies Being Monitored")
 if config:
     for company, urls in config.items():
@@ -44,4 +55,4 @@ if config:
         for section, url in urls.items():
             st.write(f"- **{section}**: {url}")
 else:
-    st.info("No companies configured yet.")
+    st.info("No companies configured.")
