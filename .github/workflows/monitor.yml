@@ -4,7 +4,8 @@ on:
   schedule:
     - cron: '0 13 * * *'  # Every day at 9am Eastern (13:00 UTC)
   workflow_dispatch:      # Allow manual trigger via GitHub UI
-
+  repository_dispatch:    # Allow for Streamlit button to force manual run
+    types: [run-monitor-now]
 jobs:
   run-monitor:
     runs-on: ubuntu-latest
