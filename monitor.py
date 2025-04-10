@@ -13,7 +13,7 @@ DATA_FILE = "page_data.json"
 SUBSCRIBERS_FILE = "subscribers.json"
 
 # --- Config ---
-EMAIL_SENDER = "youremail@gmail.com"
+EMAIL_SENDER = "connor@escalatecapital.com"
 EMAIL_PASSWORD = "rdxz ldtm sjva ffyj"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
