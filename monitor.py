@@ -3,20 +3,17 @@ import requests
 from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 import smtplib
+import os
 from supabase import create_client
-import os
-from dotenv import load_dotenv
-load_dotenv()  # Load variables from .env
 
-import os
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
-EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
-# --- Supabase setup ---
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_page_text(url):
@@ -48,13 +45,12 @@ def send_email(subject, body, recipients):
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
-        print(f"Email sent to: {', '.join(recipients)}")
+        print(f"📧 Email sent to: {', '.join(recipients)}")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"❌ Failed to send email: {e}")
 
 def monitor():
     changes = []
-    data_store = {}
 
     companies = supabase.table("companies").select("*").execute().data
     subscribers = [row["email"] for row in supabase.table("subscribers").select("*").execute().data]
@@ -69,29 +65,40 @@ def monitor():
             old_text = stored[0]["content"] if stored else ""
 
             if new_text and new_text != old_text:
-                summary = f"Change in {company} - {section} ({url})"
+                summary = f"🛎️ Change in {company} - {section} ({url})"
                 if section == "team":
                     old_people = extract_people(old_text)
                     new_people = extract_people(new_text)
                     added = new_people - old_people
                     removed = old_people - new_people
-                    summary += f"\n+ {', '.join(added)}\n- {', '.join(removed)}"
+                    if added:
+                        summary += f"\n👥 Added: {', '.join(added)}"
+                    if removed:
+                        summary += f"\n👥 Removed: {', '.join(removed)}"
                 elif section == "products":
                     diff = diff_lines(old_text, new_text)
-                    summary += "\n" + "\n".join(diff[:20])
+                    summary += "\n🛠️ Product page diff:\n" + "\n".join(diff[:20])
                 else:
-                    summary += "\nContent changed."
+                    summary += "\n📰 Content changed."
 
                 changes.append(summary)
 
                 if stored:
                     supabase.table("snapshots").update({"content": new_text}).match(row_key).execute()
                 else:
-                    supabase.table("snapshots").insert({"company": company, "section": section, "content": new_text}).execute()
+                    supabase.table("snapshots").insert({
+                        "company": company,
+                        "section": section,
+                        "content": new_text
+                    }).execute()
 
     if changes and subscribers:
         full_body = "\n\n".join(changes)
-        send_email("Company Monitor: Updates Detected", full_body, subscribers)
+        send_email("📡 Company Monitor: Changes Detected", full_body, subscribers)
+    elif changes:
+        print("Changes detected but no subscribers to notify.")
+    else:
+        print("✅ No changes detected.")
 
 if __name__ == "__main__":
     monitor()
