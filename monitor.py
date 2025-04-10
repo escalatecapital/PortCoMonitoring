@@ -5,16 +5,19 @@ from email.mime.text import MIMEText
 import smtplib
 from supabase import create_client
 import os
+from dotenv import load_dotenv
+load_dotenv()  # Load variables from .env
 
-# Supabase from environment variables
-url = os.environ.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY")
-supabase = create_client(url, key)
-
-EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
-EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
+import os
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
+
+# --- Supabase setup ---
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_page_text(url):
     try:
