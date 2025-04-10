@@ -1,0 +1,7 @@
+{
+  "acme_corp": {
+    "blog": "https://acme.com/news",
+    "team": "https://acme.com/about/team",
+    "products": "https://acme.com/products"
+  }
+}
