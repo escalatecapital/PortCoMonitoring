@@ -1,4 +1,5 @@
 import streamlit as st
+import requests
 from supabase import create_client
 
 url = st.secrets["supabase"]["url"]
@@ -42,6 +43,29 @@ for company, sections in companies.items():
     st.write(f"### {company}")
     for section, url in sections.items():
         st.write(f"- **{section}**: {url}")
+
+st.header("🚀 Manual Trigger")
+
+if st.button("Run Monitor Now"):
+    headers = {
+        "Authorization": f"Bearer {st.secrets['github']['token']}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    payload = {
+        "event_type": "run-monitor-now"
+    }
+
+    res = requests.post(
+        f"https://api.github.com/repos/{st.secrets['github']['username']}/{st.secrets['github']['repo']}/dispatches",
+        headers=headers,
+        json=payload
+    )
+
+    if res.status_code == 204:
+        st.success("✅ Monitor triggered successfully!")
+    else:
+        st.error(f"❌ Failed to trigger monitor: {res.status_code}")
 
 st.header("📬 Subscriber List")
 
