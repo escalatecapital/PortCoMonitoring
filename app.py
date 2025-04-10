@@ -3,22 +3,23 @@ import json
 import os
 
 CONFIG_FILE = "company_config.json"
+SUBSCRIBERS_FILE = "subscribers.json"
 
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
-        return {}
-    with open(CONFIG_FILE, "r") as f:
+def load_json(path, default):
+    if not os.path.exists(path):
+        return default
+    with open(path, "r") as f:
         return json.load(f)
 
-def save_config(config):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(config, f, indent=2)
+def save_json(data, path):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
 
+# --- Company Config Management ---
 st.title("📡 Company Monitoring Config Tool")
 
-config = load_config()
+config = load_json(CONFIG_FILE, {})
 
-# Add or update company
 with st.form("Add/Update Company"):
     st.subheader("Add or Update Company Configuration")
     company_name = st.text_input("Company Name (e.g., acme_corp)")
@@ -33,21 +34,19 @@ with st.form("Add/Update Company"):
             "team": team_url,
             "products": product_url
         }
-        save_config(config)
+        save_json(config, CONFIG_FILE)
         st.success(f"✅ Saved config for {company_name}")
 
-# Display and allow removal of companies
 st.subheader("🗑️ Remove Company From Monitoring")
 if config:
     company_to_remove = st.selectbox("Select a company to remove", [""] + list(config.keys()))
     if st.button("Remove Selected Company") and company_to_remove:
         del config[company_to_remove]
-        save_config(config)
+        save_json(config, CONFIG_FILE)
         st.success(f"🗑️ Removed {company_to_remove} from configuration.")
 else:
     st.info("No companies configured yet.")
 
-# Show current config
 st.subheader("📘 Current Companies Being Monitored")
 if config:
     for company, urls in config.items():
@@ -56,3 +55,31 @@ if config:
             st.write(f"- **{section}**: {url}")
 else:
     st.info("No companies configured.")
+
+# --- Subscriber Management ---
+st.title("📬 Subscriber Management")
+
+subscribers = load_json(SUBSCRIBERS_FILE, [])
+
+new_email = st.text_input("Enter email to subscribe")
+if st.button("Add Subscriber") and new_email:
+    if new_email not in subscribers:
+        subscribers.append(new_email)
+        save_json(subscribers, SUBSCRIBERS_FILE)
+        st.success(f"✅ Added {new_email} to subscribers.")
+    else:
+        st.warning("This email is already subscribed.")
+
+if subscribers:
+    st.write("### Current Subscribers")
+    for i, email in enumerate(subscribers):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(email)
+        with col2:
+            if st.button(f"Remove", key=f"remove_{i}"):
+                subscribers.pop(i)
+                save_json(subscribers, SUBSCRIBERS_FILE)
+                st.success(f"Removed {email}")
+else:
+    st.info("No subscribers yet.")
