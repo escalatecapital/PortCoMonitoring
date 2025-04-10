@@ -14,7 +14,7 @@ SUBSCRIBERS_FILE = "subscribers.json"
 
 # --- Config ---
 EMAIL_SENDER = "youremail@gmail.com"
-EMAIL_PASSWORD = "your_app_password"
+EMAIL_PASSWORD = "rdxz ldtm sjva ffyj"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
