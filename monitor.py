@@ -1,24 +1,21 @@
+import difflib
 import requests
 from bs4 import BeautifulSoup
-import hashlib
-import json
-import os
-import difflib
-import smtplib
 from email.mime.text import MIMEText
+import smtplib
+from supabase import create_client
+import os
 
-# --- File paths ---
-CONFIG_FILE = "company_config.json"
-DATA_FILE = "page_data.json"
-SUBSCRIBERS_FILE = "subscribers.json"
+# Supabase from environment variables
+url = os.environ.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY")
+supabase = create_client(url, key)
 
-# --- Config ---
-EMAIL_SENDER = "connor@escalatecapital.com"
-EMAIL_PASSWORD = "rdxz ldtm sjva ffyj"
+EMAIL_SENDER = os.environ.get("EMAIL_SENDER")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
 
-# --- Utility Functions ---
 def fetch_page_text(url):
     try:
         response = requests.get(url, timeout=10)
@@ -26,18 +23,8 @@ def fetch_page_text(url):
         for tag in soup(["script", "style"]): tag.decompose()
         return soup.get_text(separator='\n', strip=True)
     except Exception as e:
-        print(f"❌ Error fetching {url}: {e}")
+        print(f"Error fetching {url}: {e}")
         return None
-
-def load_json(path, default={}):
-    if not os.path.exists(path):
-        return default
-    with open(path, "r") as f:
-        return json.load(f)
-
-def save_json(data, path):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
 
 def diff_lines(old, new):
     return list(difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm=''))
@@ -58,67 +45,50 @@ def send_email(subject, body, recipients):
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
-        print(f"📧 Email sent to: {', '.join(recipients)}")
+        print(f"Email sent to: {', '.join(recipients)}")
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        print(f"Failed to send email: {e}")
 
-# --- Main Monitoring Logic ---
-def monitor_all():
-    config = load_json(CONFIG_FILE)
-    previous_data = load_json(DATA_FILE)
-    subscribers = load_json(SUBSCRIBERS_FILE, [])
+def monitor():
+    changes = []
+    data_store = {}
 
-    change_summary = []
+    companies = supabase.table("companies").select("*").execute().data
+    subscribers = [row["email"] for row in supabase.table("subscribers").select("*").execute().data]
 
-    for company, sections in config.items():
+    for company in set(row["name"] for row in companies):
+        sections = {row["section"]: row["url"] for row in companies if row["name"] == company}
         for section, url in sections.items():
-            print(f"🔍 Checking {company} - {section} @ {url}")
-            new_text = fetch_page_text(url)
-            if not new_text:
-                continue
-
             key = f"{company}:{section}"
-            old_text = previous_data.get(key, "")
+            new_text = fetch_page_text(url)
+            row_key = {"company": company, "section": section}
+            stored = supabase.table("snapshots").select("content").match(row_key).execute().data
+            old_text = stored[0]["content"] if stored else ""
 
-            if new_text != old_text:
-                summary = f"\n🛎️ Change detected in {company} - {section} ({url})"
-
-                if section == "blog":
-                    soup_new = BeautifulSoup(new_text, 'html.parser')
-                    soup_old = BeautifulSoup(old_text, 'html.parser')
-                    links_new = set(a['href'] for a in soup_new.find_all('a', href=True))
-                    links_old = set(a['href'] for a in soup_old.find_all('a', href=True))
-                    new_articles = links_new - links_old
-                    if new_articles:
-                        summary += "\n📰 New articles:\n" + "\n".join(f" - {link}" for link in new_articles)
-
-                elif section == "team":
-                    people_new = extract_people(new_text)
-                    people_old = extract_people(old_text)
-                    added = people_new - people_old
-                    removed = people_old - people_new
-                    if added:
-                        summary += "\n👥 Added team members:\n" + "\n".join(f" + {p}" for p in added)
-                    if removed:
-                        summary += "\n👥 Removed team members:\n" + "\n".join(f" - {p}" for p in removed)
-
+            if new_text and new_text != old_text:
+                summary = f"Change in {company} - {section} ({url})"
+                if section == "team":
+                    old_people = extract_people(old_text)
+                    new_people = extract_people(new_text)
+                    added = new_people - old_people
+                    removed = old_people - new_people
+                    summary += f"\n+ {', '.join(added)}\n- {', '.join(removed)}"
                 elif section == "products":
                     diff = diff_lines(old_text, new_text)
-                    summary += "\n🛠️ Product page diff:\n" + "\n".join(diff[:20])  # Limit lines for email
+                    summary += "\n" + "\n".join(diff[:20])
+                else:
+                    summary += "\nContent changed."
 
-                change_summary.append(summary)
-                previous_data[key] = new_text
+                changes.append(summary)
 
-    save_json(previous_data, DATA_FILE)
+                if stored:
+                    supabase.table("snapshots").update({"content": new_text}).match(row_key).execute()
+                else:
+                    supabase.table("snapshots").insert({"company": company, "section": section, "content": new_text}).execute()
 
-    # Send summary if there are changes
-    if change_summary and subscribers:
-        full_body = "\n\n".join(change_summary)
-        send_email("📡 Company Monitor: Changes Detected", full_body, subscribers)
-    elif change_summary:
-        print("⚠️ Changes found but no subscribers to notify.")
-    else:
-        print("✅ No changes detected.")
+    if changes and subscribers:
+        full_body = "\n\n".join(changes)
+        send_email("Company Monitor: Updates Detected", full_body, subscribers)
 
 if __name__ == "__main__":
-    monitor_all()
+    monitor()
