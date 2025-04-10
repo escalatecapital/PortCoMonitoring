@@ -17,13 +17,30 @@ SMTP_PORT = 465
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def fetch_page_text(url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/122.0.0.0 Safari/537.36"
+        )
+    }
+
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 403:
+            print(f"⚠️ 403 Forbidden at {url} — site is blocking scrapers.")
+            return "403 Forbidden"
+        elif response.status_code != 200:
+            print(f"⚠️ Error {response.status_code} while accessing {url}")
+            return f"Error {response.status_code}"
+
         soup = BeautifulSoup(response.text, 'html.parser')
-        for tag in soup(["script", "style"]): tag.decompose()
+        for tag in soup(["script", "style"]):
+            tag.decompose()
         return soup.get_text(separator='\n', strip=True)
+
     except Exception as e:
-        print(f"Error fetching {url}: {e}")
+        print(f"❌ Exception fetching {url}: {e}")
         return None
 
 def diff_lines(old, new):
