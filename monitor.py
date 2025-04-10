@@ -106,8 +106,9 @@ def monitor():
                     supabase.table("snapshots").insert({
                         "company": company,
                         "section": section,
-                        "content": new_text
-                    }).execute()
+                        "content": new_text,
+                        "captured_at": datetime.utcnow().isoformat()
+                }).execute()
 
     if changes and subscribers:
         full_body = "\n\n".join(changes)
