@@ -1,86 +1,76 @@
-import os
-import json
 import streamlit as st
+from supabase import create_client
 
-BASE_DIR = os.path.dirname(__file__)
-CONFIG_FILE = os.path.join(BASE_DIR, "company_config.json")
-SUBSCRIBERS_FILE = os.path.join(BASE_DIR, "subscribers.json")
+# --- Supabase Setup ---
+url = st.secrets["supabase"]["url"]
+key = st.secrets["supabase"]["key"]
+supabase = create_client(url, key)
 
-def load_json(path, default):
-    if not os.path.exists(path):
-        return default
-    with open(path, "r") as f:
-        return json.load(f)
+st.title("📡 Company Monitoring Dashboard (Supabase Edition)")
 
-def save_json(data, path):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+# --- Company Management ---
+st.header("🛠️ Manage Companies")
 
-# --- Company Config Management ---
-st.title("📡 Company Monitoring Config Tool")
+def load_companies():
+    data = supabase.table("companies").select("*").execute().data
+    company_map = {}
+    for row in data:
+        company_map.setdefault(row["name"], {})[row["section"]] = row["url"]
+    return company_map
 
-config = load_json(CONFIG_FILE, {})
+def save_company(name, section_map):
+    supabase.table("companies").delete().eq("name", name).execute()
+    for section, url in section_map.items():
+        supabase.table("companies").insert({
+            "name": name,
+            "section": section,
+            "url": url
+        }).execute()
 
-with st.form("Add/Update Company"):
-    st.subheader("Add or Update Company Configuration")
-    company_name = st.text_input("Company Name (e.g., acme_corp)")
-    blog_url = st.text_input("Blog/News/Press URL")
-    team_url = st.text_input("Team/About URL")
-    product_url = st.text_input("Products/Services URL")
+companies = load_companies()
 
-    submitted = st.form_submit_button("Save Company")
-    if submitted and company_name:
-        config[company_name] = {
-            "blog": blog_url,
-            "team": team_url,
-            "products": product_url
-        }
-        save_json(config, CONFIG_FILE)
-        st.success(f"✅ Saved config for {company_name}")
+with st.form("Add Company"):
+    st.subheader("Add or Update a Company")
+    name = st.text_input("Company Name")
+    blog = st.text_input("Blog/News URL")
+    team = st.text_input("Team/About URL")
+    products = st.text_input("Products/Services URL")
+    if st.form_submit_button("Save Company"):
+        save_company(name, {"blog": blog, "team": team, "products": products})
+        st.success(f"Saved {name}!")
 
-st.subheader("🗑️ Remove Company From Monitoring")
-if config:
-    company_to_remove = st.selectbox("Select a company to remove", [""] + list(config.keys()))
-    if st.button("Remove Selected Company") and company_to_remove:
-        del config[company_to_remove]
-        save_json(config, CONFIG_FILE)
-        st.success(f"🗑️ Removed {company_to_remove} from configuration.")
-else:
-    st.info("No companies configured yet.")
-
-st.subheader("📘 Current Companies Being Monitored")
-if config:
-    for company, urls in config.items():
-        st.write(f"### {company}")
-        for section, url in urls.items():
-            st.write(f"- **{section}**: {url}")
-else:
-    st.info("No companies configured.")
+# Display companies
+st.subheader("Companies Being Monitored")
+for company, sections in companies.items():
+    st.write(f"### {company}")
+    for section, url in sections.items():
+        st.write(f"- **{section}**: {url}")
 
 # --- Subscriber Management ---
-st.title("📬 Subscriber Management")
+st.header("📬 Subscriber List")
 
-subscribers = load_json(SUBSCRIBERS_FILE, [])
+def load_subscribers():
+    return [row["email"] for row in supabase.table("subscribers").select("*").execute().data]
 
-new_email = st.text_input("Enter email to subscribe")
-if st.button("Add Subscriber") and new_email:
+def add_subscriber(email):
+    supabase.table("subscribers").insert({"email": email}).execute()
+
+def remove_subscriber(email):
+    supabase.table("subscribers").delete().eq("email", email).execute()
+
+subscribers = load_subscribers()
+new_email = st.text_input("Add subscriber email")
+if st.button("Add Subscriber"):
     if new_email not in subscribers:
-        subscribers.append(new_email)
-        save_json(subscribers, SUBSCRIBERS_FILE)
-        st.success(f"✅ Added {new_email} to subscribers.")
-    else:
-        st.warning("This email is already subscribed.")
+        add_subscriber(new_email)
+        st.success(f"Added {new_email}")
 
-if subscribers:
-    st.write("### Current Subscribers")
-    for i, email in enumerate(subscribers):
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            st.write(email)
-        with col2:
-            if st.button(f"Remove", key=f"remove_{i}"):
-                subscribers.pop(i)
-                save_json(subscribers, SUBSCRIBERS_FILE)
-                st.success(f"Removed {email}")
-else:
-    st.info("No subscribers yet.")
+st.write("### Current Subscribers")
+for email in subscribers:
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.write(email)
+    with col2:
+        if st.button("Remove", key=email):
+            remove_subscriber(email)
+            st.success(f"Removed {email}")
