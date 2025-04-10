@@ -1,9 +1,10 @@
-import streamlit as st
-import json
 import os
+import json
+import streamlit as st
 
-CONFIG_FILE = "company_config.json"
-SUBSCRIBERS_FILE = "subscribers.json"
+BASE_DIR = os.path.dirname(__file__)
+CONFIG_FILE = os.path.join(BASE_DIR, "company_config.json")
+SUBSCRIBERS_FILE = os.path.join(BASE_DIR, "subscribers.json")
 
 def load_json(path, default):
     if not os.path.exists(path):
