@@ -83,24 +83,31 @@ def monitor():
                 try:
                     # Get current data
                     rating, reviews = get_glassdoor_data(url)
-                    summary = f"⭐ Glassdoor for {company}: {rating}"
-
-                    # Get historical data from Wayback Machine
-                    past_rating, snapshot_url = get_historical_rating(url)
-                        if past_rating:
-                            summary += f" (↓ from {past_rating} a year ago)"
-                        else:
-                            summary += " (No historical rating available)"
-
-                    # Add most recent review
-                        if reviews:
-                            top_review = reviews[0]
-                            summary += f"\\n📝 Recent Review: “{top_review['title']}” — {top_review['snippet']}"
-                        else:
-                            summary += "\\n📝 No recent reviews found."
-                except Exception as e:
-                    summary = f"⚠️ Could not retrieve Glassdoor data for {company}: {str(e)}"
-                changes.append(summary)
+                    # Compute delta
+                    current = float(rating) if rating and rating.replace(".", "", 1).isdigit() else None
+                    past = float(past_rating) if past_rating and past_rating.replace(".", "", 1).isdigit() else None
+                    delta = round(current - past, 2) if current is not None and past is not None else None
+                    
+                    top_review = reviews[0] if reviews else {"title": None, "snippet": None}
+                    
+                    # Upsert into Supabase
+                    supabase.table("glassdoor_insights").upsert({
+                        "company": company,
+                        "current_rating": current,
+                        "past_rating": past,
+                        "rating_delta": delta,
+                        "review_title": top_review["title"],
+                        "review_snippet": top_review["snippet"],
+                        "updated_at": datetime.utcnow().isoformat()
+                    }, on_conflict=["company"]).execute()
+                    
+                    # Still add a summary to the email
+                    summary = f"⭐ Glassdoor for {company}: {current}"
+                    if past:
+                        summary += f" (↓ from {past} a year ago)"
+                    if top_review["title"]:
+                        summary += f"\\n📝 {top_review['title']} — {top_review['snippet']}"
+                    changes.append(summary)
             continue
 
             # Standard monitoring for other sections
