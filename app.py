@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+import pandas as pd
 from supabase import create_client
 
 url = st.secrets["supabase"]["url"]
@@ -46,22 +46,12 @@ with st.form("Add Company"):
 
 st.title("📊 Company Monitoring Dashboard")
 
-def load_companies():
-    data = supabase.table("companies").select("*").execute().data
-    company_map = {}
-    for row in data:
-        company_map.setdefault(row["name"], {})[row["section"]] = row["url"]
-    return company_map
-
-companies = load_companies()
-
-glassdoor_rows = []
-
 st.header("🔎 Glassdoor Insights")
 
+# Load pre-saved data from Supabase (written by monitor.py)
 data = supabase.table("glassdoor_insights").select("*").execute().data
+
 if data:
-    import pandas as pd
     df = pd.DataFrame(data)
     df = df.rename(columns={
         "company": "Company",
