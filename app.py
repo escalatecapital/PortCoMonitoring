@@ -61,54 +61,22 @@ glassdoor_rows = []
 
 st.header("🔎 Glassdoor Insights")
 
-for company, sections in companies.items():
-    if "glassdoor" in sections:
-        current_rating = "N/A"
-        past_rating = "N/A"
-        delta = "N/A"
-        recent_review = "No recent review"
-
-        try:
-            current_rating, reviews = get_glassdoor_data(sections["glassdoor"])
-            current_rating = float(current_rating)
-        except:
-            pass
-
-        try:
-            past_rating_text, _ = get_historical_rating(sections["glassdoor"])
-            if past_rating_text:
-                past_rating = float(past_rating_text)
-        except:
-            pass
-
-        if isinstance(current_rating, float) and isinstance(past_rating, float):
-            delta = round(current_rating - past_rating, 2)
-
-        if reviews:
-            top_review = reviews[0]
-            recent_review = f"{top_review['title']} — {top_review['snippet']}"
-
-        glassdoor_rows.append({
-            "Company": company,
-            "Current Rating": current_rating,
-            "Rating 12mo Ago": past_rating,
-            "Change": delta,
-            "Most Recent Review": recent_review
-        })
-
-if glassdoor_rows:
+data = supabase.table("glassdoor_insights").select("*").execute().data
+if data:
     import pandas as pd
-    df = pd.DataFrame(glassdoor_rows)
-    st.dataframe(df)
+    df = pd.DataFrame(data)
+    df = df.rename(columns={
+        "company": "Company",
+        "current_rating": "Current Rating",
+        "past_rating": "Rating 12mo Ago",
+        "rating_delta": "Change",
+        "review_title": "Review Title",
+        "review_snippet": "Review Snippet"
+    })
+    st.dataframe(df[["Company", "Current Rating", "Rating 12mo Ago", "Change", "Review Title", "Review Snippet"]])
 else:
-    st.info("No Glassdoor data available yet.")
-
-st.subheader("Companies Being Monitored")
-for company, sections in companies.items():
-    st.write(f"### {company}")
-    for section, url in sections.items():
-        st.write(f"- **{section}**: {url}")
-
+    st.info("No Glassdoor data available yet. Try running the monitor.")
+    
 st.header("📬 Subscriber List")
 
 def load_subscribers():
