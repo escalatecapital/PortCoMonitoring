@@ -5,6 +5,8 @@ from email.mime.text import MIMEText
 import smtplib
 import os
 from supabase import create_client
+from datetime import datetime
+from glassdoor_scraper import get_glassdoor_data
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -28,19 +30,17 @@ def fetch_page_text(url):
     try:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 403:
-            print(f"⚠️ 403 Forbidden at {url} — site is blocking scrapers.")
+            print(f"⚠️ 403 Forbidden at {url}")
             return "403 Forbidden"
         elif response.status_code != 200:
-            print(f"⚠️ Error {response.status_code} while accessing {url}")
+            print(f"⚠️ Error {response.status_code} at {url}")
             return f"Error {response.status_code}"
 
         soup = BeautifulSoup(response.text, 'html.parser')
-        for tag in soup(["script", "style"]):
-            tag.decompose()
+        for tag in soup(["script", "style"]): tag.decompose()
         return soup.get_text(separator='\n', strip=True)
-
     except Exception as e:
-        print(f"❌ Exception fetching {url}: {e}")
+        print(f"❌ Error fetching {url}: {e}")
         return None
 
 def diff_lines(old, new):
@@ -76,6 +76,23 @@ def monitor():
         sections = {row["section"]: row["url"] for row in companies if row["name"] == company}
         for section, url in sections.items():
             key = f"{company}:{section}"
+
+            # Handle Glassdoor differently
+            if section == "glassdoor":
+                try:
+                    rating, reviews = get_glassdoor_data(url)
+                    summary = f"⭐ Glassdoor for {company}: {rating}"
+                    if reviews:
+                        top_review = reviews[0]
+                        summary += f"\n📝 Recent Review: “{top_review['title']}” — {top_review['snippet']}"
+                    else:
+                        summary += "\n📝 No recent reviews found."
+                except Exception as e:
+                    summary = f"⚠️ Could not retrieve Glassdoor data for {company}: {str(e)}"
+                changes.append(summary)
+                continue
+
+            # Standard monitoring for other sections
             new_text = fetch_page_text(url)
             row_key = {"company": company, "section": section}
             stored = supabase.table("snapshots").select("content").match(row_key).execute().data
@@ -101,14 +118,17 @@ def monitor():
                 changes.append(summary)
 
                 if stored:
-                    supabase.table("snapshots").update({"content": new_text}).match(row_key).execute()
+                    supabase.table("snapshots").update({
+                        "content": new_text,
+                        "captured_at": datetime.utcnow().isoformat()
+                    }).match(row_key).execute()
                 else:
                     supabase.table("snapshots").insert({
                         "company": company,
                         "section": section,
                         "content": new_text,
                         "captured_at": datetime.utcnow().isoformat()
-                }).execute()
+                    }).execute()
 
     if changes and subscribers:
         full_body = "\n\n".join(changes)
