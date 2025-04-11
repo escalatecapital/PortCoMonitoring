@@ -44,6 +44,8 @@ with st.form("Add Company"):
         })
         st.success(f"Saved {name}!")
 
+st.header("🔎 Glassdoor Preview")
+
 st.subheader("Companies Being Monitored")
 for company, sections in companies.items():
     st.write(f"### {company}")
