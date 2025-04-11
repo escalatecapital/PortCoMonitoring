@@ -19,9 +19,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install monitor dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements-monitor.txt
+          python -m playwright install --with-deps
 
       - name: 🧪 Install Playwright Browsers
         run: |
