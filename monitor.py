@@ -7,6 +7,7 @@ import os
 from supabase import create_client
 from datetime import datetime
 from glassdoor_scraper import get_glassdoor_data
+from glassdoor_wayback import get_historical_rating
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -78,19 +79,29 @@ def monitor():
             key = f"{company}:{section}"
 
             # Handle Glassdoor differently
-            if section == "glassdoor":
+           if section == "glassdoor":
                 try:
+                    # Get current data
                     rating, reviews = get_glassdoor_data(url)
                     summary = f"⭐ Glassdoor for {company}: {rating}"
-                    if reviews:
-                        top_review = reviews[0]
-                        summary += f"\n📝 Recent Review: “{top_review['title']}” — {top_review['snippet']}"
-                    else:
-                        summary += "\n📝 No recent reviews found."
+
+                    # Get historical data from Wayback Machine
+                    past_rating, snapshot_url = get_historical_rating(url)
+                        if past_rating:
+                            summary += f" (↓ from {past_rating} a year ago)"
+                        else:
+                            summary += " (No historical rating available)"
+
+                    # Add most recent review
+                        if reviews:
+                            top_review = reviews[0]
+                            summary += f"\\n📝 Recent Review: “{top_review['title']}” — {top_review['snippet']}"
+                        else:
+                            summary += "\\n📝 No recent reviews found."
                 except Exception as e:
                     summary = f"⚠️ Could not retrieve Glassdoor data for {company}: {str(e)}"
                 changes.append(summary)
-                continue
+            continue
 
             # Standard monitoring for other sections
             new_text = fetch_page_text(url)
