@@ -49,7 +49,7 @@ def diff_lines(old, new):
 def extract_people(text):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return set(line for line in lines if any(role in line.lower() for role in [
-        "ceo", "cto", "chief", "vp", "president", "director", "lead", "head", "officer"
+        "ceo", "cto", "founder", "co-founder", "cro", "chief", "vp", "president", "director", "lead", "head", "officer", "chair")
     ]))
 
 def send_email(subject, body, recipients):
