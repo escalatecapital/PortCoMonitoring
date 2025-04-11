@@ -6,8 +6,8 @@ import smtplib
 import os
 from datetime import datetime
 from supabase import create_client
-from backend.glassdoor_scraper import get_glassdoor_data
-from backend.glassdoor_wayback import get_historical_rating
+from .glassdoor_scraper import get_glassdoor_data
+from .glassdoor_wayback import get_historical_rating
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
