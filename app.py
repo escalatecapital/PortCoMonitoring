@@ -56,6 +56,29 @@ with st.form("Add Company"):
         except Exception as e:
             st.error(f"❌ Failed to save company config: {e}")
 
+st.subheader("🚀 Manual Trigger")
+
+if st.button("Run Monitor Now"):
+    headers = {
+        "Authorization": f"Bearer {st.secrets['github']['token']}",
+        "Accept": "application/vnd.github+json"
+    }
+
+    payload = {
+        "event_type": "run-monitor-now"
+    }
+
+    res = requests.post(
+        f"https://api.github.com/repos/{st.secrets['github']['username']}/{st.secrets['github']['repo']}/dispatches",
+        headers=headers,
+        json=payload
+    )
+
+    if res.status_code == 204:
+        st.success("✅ Monitor triggered successfully!")
+    else:
+        st.error(f"❌ Failed to trigger monitor: {res.status_code}")
+
 st.subheader("📘 Current Companies Being Monitored")
 for company, sections in company_map.items():
     st.write(f"### {company}")
