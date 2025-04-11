@@ -19,7 +19,7 @@ def get_glassdoor_data(glassdoor_url):
             review_elements = page.query_selector_all(review_selector)
 
             recent_reviews = []
-            for el in review_elements[:1]:
+            for el in review_elements[:3]:
                 title = el.query_selector('span[data-test="review-title"]')
                 snippet = el.query_selector('span[data-test="review-snippet"]')
                 review_data = {
