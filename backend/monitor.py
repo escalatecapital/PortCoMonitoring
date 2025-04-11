@@ -4,10 +4,10 @@ from bs4 import BeautifulSoup
 from email.mime.text import MIMEText
 import smtplib
 import os
-from supabase import create_client
 from datetime import datetime
-from glassdoor_scraper import get_glassdoor_data
-from glassdoor_wayback import get_historical_rating
+from supabase import create_client
+from backend.glassdoor_scraper import get_glassdoor_data
+from backend.glassdoor_wayback import get_historical_rating
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -27,21 +27,16 @@ def fetch_page_text(url):
             "Chrome/122.0.0.0 Safari/537.36"
         )
     }
-
     try:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 403:
-            print(f"⚠️ 403 Forbidden at {url}")
             return "403 Forbidden"
         elif response.status_code != 200:
-            print(f"⚠️ Error {response.status_code} at {url}")
             return f"Error {response.status_code}"
-
         soup = BeautifulSoup(response.text, 'html.parser')
         for tag in soup(["script", "style"]): tag.decompose()
         return soup.get_text(separator='\n', strip=True)
     except Exception as e:
-        print(f"❌ Error fetching {url}: {e}")
         return None
 
 def diff_lines(old, new):
@@ -50,7 +45,7 @@ def diff_lines(old, new):
 def extract_people(text):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     return set(line for line in lines if any(role in line.lower() for role in [
-        "ceo", "cto", "founder", "co-founder", "cro", "chief", "vp", "president", "director", "lead", "head", "officer", "chair"
+        "ceo", "cto", "chief", "vp", "president", "director", "lead", "head", "officer"
     ]))
 
 def send_email(subject, body, recipients):
@@ -62,10 +57,9 @@ def send_email(subject, body, recipients):
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
-        print(f"📧 Email sent to: {', '.join(recipients)}")
+            server.sendmail(msg["From"], recipients, msg.as_string())
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
+        print(f"Failed to send email: {e}")
 
 def monitor():
     changes = []
@@ -78,19 +72,16 @@ def monitor():
         for section, url in sections.items():
             key = f"{company}:{section}"
 
-            # Handle Glassdoor differently
-           if section == "glassdoor":
+            if section == "glassdoor":
                 try:
-                    # Get current data
                     rating, reviews = get_glassdoor_data(url)
-                    # Compute delta
+                    past_rating, _ = get_historical_rating(url)
+
                     current = float(rating) if rating and rating.replace(".", "", 1).isdigit() else None
                     past = float(past_rating) if past_rating and past_rating.replace(".", "", 1).isdigit() else None
                     delta = round(current - past, 2) if current is not None and past is not None else None
-                    
                     top_review = reviews[0] if reviews else {"title": None, "snippet": None}
-                    
-                    # Upsert into Supabase
+
                     supabase.table("glassdoor_insights").upsert({
                         "company": company,
                         "current_rating": current,
@@ -100,17 +91,17 @@ def monitor():
                         "review_snippet": top_review["snippet"],
                         "updated_at": datetime.utcnow().isoformat()
                     }, on_conflict=["company"]).execute()
-                    
-                    # Still add a summary to the email
+
                     summary = f"⭐ Glassdoor for {company}: {current}"
                     if past:
                         summary += f" (↓ from {past} a year ago)"
                     if top_review["title"]:
-                        summary += f"\\n📝 {top_review['title']} — {top_review['snippet']}"
+                        summary += f"\n📝 {top_review['title']} — {top_review['snippet']}"
                     changes.append(summary)
-            continue
+                except Exception as e:
+                    changes.append(f"⚠️ Could not retrieve Glassdoor data for {company}: {str(e)}")
+                continue
 
-            # Standard monitoring for other sections
             new_text = fetch_page_text(url)
             row_key = {"company": company, "section": section}
             stored = supabase.table("snapshots").select("content").match(row_key).execute().data
@@ -132,7 +123,6 @@ def monitor():
                     summary += "\n🛠️ Product page diff:\n" + "\n".join(diff[:20])
                 else:
                     summary += "\n📰 Content changed."
-
                 changes.append(summary)
 
                 if stored:
