@@ -2,4 +2,3 @@ streamlit
 supabase
 beautifulsoup4
 requests
-playwright
