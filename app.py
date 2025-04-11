@@ -48,22 +48,28 @@ st.title("📊 Company Monitoring Dashboard")
 
 st.header("🔎 Glassdoor Insights")
 
-# Load pre-saved data from Supabase (written by monitor.py)
-data = supabase.table("glassdoor_insights").select("*").execute().data
+try:
+    st.write("⏳ Querying Supabase...")
+    response = supabase.table("glassdoor_insights").select("*").execute()
+    data = response.data
+    st.write("✅ Data fetched!")
 
-if data:
-    df = pd.DataFrame(data)
-    df = df.rename(columns={
-        "company": "Company",
-        "current_rating": "Current Rating",
-        "past_rating": "Rating 12mo Ago",
-        "rating_delta": "Change",
-        "review_title": "Review Title",
-        "review_snippet": "Review Snippet"
-    })
-    st.dataframe(df[["Company", "Current Rating", "Rating 12mo Ago", "Change", "Review Title", "Review Snippet"]])
-else:
-    st.info("No Glassdoor data available yet. Try running the monitor.")
+    if data:
+        df = pd.DataFrame(data)
+        df = df.rename(columns={
+            "company": "Company",
+            "current_rating": "Current Rating",
+            "past_rating": "Rating 12mo Ago",
+            "rating_delta": "Change",
+            "review_title": "Review Title",
+            "review_snippet": "Review Snippet"
+        })
+        st.dataframe(df[["Company", "Current Rating", "Rating 12mo Ago", "Change", "Review Title", "Review Snippet"]])
+    else:
+        st.info("No Glassdoor data available yet. Try running the monitor.")
+
+except Exception as e:
+    st.error(f"❌ Error fetching Glassdoor data: {e}")
     
 st.header("📬 Subscriber List")
 
