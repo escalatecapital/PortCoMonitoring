@@ -23,6 +23,10 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: 🧪 Install Playwright Browsers
+        run: |
+          python -m playwright install --with-deps
+
       - name: 🔐 Run monitor.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
