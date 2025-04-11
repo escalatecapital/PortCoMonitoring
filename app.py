@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 from supabase import create_client
+from glassdoor_scraper import get_glassdoor_data
+from glassdoor_wayback import get_historical_rating
 
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
@@ -44,7 +46,62 @@ with st.form("Add Company"):
         })
         st.success(f"Saved {name}!")
 
-st.header("🔎 Glassdoor Preview")
+st.title("📊 Company Monitoring Dashboard")
+
+def load_companies():
+    data = supabase.table("companies").select("*").execute().data
+    company_map = {}
+    for row in data:
+        company_map.setdefault(row["name"], {})[row["section"]] = row["url"]
+    return company_map
+
+companies = load_companies()
+
+glassdoor_rows = []
+
+st.header("🔎 Glassdoor Insights")
+
+for company, sections in companies.items():
+    if "glassdoor" in sections:
+        current_rating = "N/A"
+        past_rating = "N/A"
+        delta = "N/A"
+        recent_review = "No recent review"
+
+        try:
+            current_rating, reviews = get_glassdoor_data(sections["glassdoor"])
+            current_rating = float(current_rating)
+        except:
+            pass
+
+        try:
+            past_rating_text, _ = get_historical_rating(sections["glassdoor"])
+            if past_rating_text:
+                past_rating = float(past_rating_text)
+        except:
+            pass
+
+        if isinstance(current_rating, float) and isinstance(past_rating, float):
+            delta = round(current_rating - past_rating, 2)
+
+        if reviews:
+            top_review = reviews[0]
+            recent_review = f"{top_review['title']} — {top_review['snippet']}"
+
+        glassdoor_rows.append({
+            "Company": company,
+            "Current Rating": current_rating,
+            "Rating 12mo Ago": past_rating,
+            "Change": delta,
+            "Most Recent Review": recent_review
+        })
+
+if glassdoor_rows:
+    import pandas as pd
+    df = pd.DataFrame(glassdoor_rows)
+    st.dataframe(df)
+else:
+    st.info("No Glassdoor data available yet.")
 
 st.subheader("Companies Being Monitored")
 for company, sections in companies.items():
