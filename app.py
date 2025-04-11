@@ -2,9 +2,22 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client
 
-url = st.secrets["supabase"]["url"]
-key = st.secrets["supabase"]["key"]
-supabase = create_client(url, key)
+# Step 1: Load Supabase secrets
+try:
+    url = st.secrets["supabase"]["url"]
+    key = st.secrets["supabase"]["key"]
+    st.success("✅ Supabase secrets loaded successfully.")
+except Exception as e:
+    st.error(f"❌ Could not load Supabase secrets: {e}")
+    st.stop()
+
+# Step 2: Connect to Supabase
+try:
+    supabase = create_client(url, key)
+    st.success("✅ Connected to Supabase.")
+except Exception as e:
+    st.error(f"❌ Failed to initialize Supabase client: {e}")
+    st.stop()
 
 st.title("📡 Company Monitoring Dashboard")
 
@@ -44,17 +57,21 @@ with st.form("Add Company"):
         })
         st.success(f"Saved {name}!")
 
-st.title("📊 Company Monitoring Dashboard")
-
+# Step 3: Query Glassdoor insights
 st.header("🔎 Glassdoor Insights")
 
 try:
-    st.write("⏳ Querying Supabase...")
-    response = supabase.table("glassdoor_insights").select("*").execute()
-    data = response.data
-    st.write("✅ Data fetched!")
+    with st.spinner("📡 Querying glassdoor_insights from Supabase..."):
+        response = supabase.table("glassdoor_insights").select("*").execute()
+        data = response.data
+    st.success("✅ Data retrieved successfully.")
+except Exception as e:
+    st.error(f"❌ Error retrieving data from Supabase: {e}")
+    st.stop()
 
-    if data:
+# Step 4: Display results
+if data:
+    try:
         df = pd.DataFrame(data)
         df = df.rename(columns={
             "company": "Company",
@@ -65,11 +82,10 @@ try:
             "review_snippet": "Review Snippet"
         })
         st.dataframe(df[["Company", "Current Rating", "Rating 12mo Ago", "Change", "Review Title", "Review Snippet"]])
-    else:
-        st.info("No Glassdoor data available yet. Try running the monitor.")
-
-except Exception as e:
-    st.error(f"❌ Error fetching Glassdoor data: {e}")
+    except Exception as e:
+        st.error(f"⚠️ Error formatting or displaying data: {e}")
+else:
+    st.info("ℹ️ No Glassdoor data available yet. Try running the monitor.")
     
 st.header("📬 Subscriber List")
 
