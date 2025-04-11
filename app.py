@@ -81,10 +81,20 @@ if st.button("Run Monitor Now"):
         st.error(f"❌ Failed to trigger monitor: {res.status_code}")
 
 st.subheader("📘 Current Companies Being Monitored")
+
 for company, sections in company_map.items():
-    st.write(f"### {company}")
-    for section, url in sections.items():
-        st.write(f"- **{section}**: {url}")
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        st.write(f"### {company}")
+        for section, url in sections.items():
+            st.write(f"- **{section}**: {url}")
+    with col2:
+        if st.button(f"Remove", key=f"remove_{company}"):
+            try:
+                supabase.table("companies").delete().eq("name", company).execute()
+                st.success(f"✅ Removed {company}")
+            except Exception as e:
+                st.error(f"❌ Failed to remove {company}: {e}")
 
 # ✅ Glassdoor Insights Table
 st.header("🔎 Glassdoor Insights")
