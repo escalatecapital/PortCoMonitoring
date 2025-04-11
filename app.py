@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
 from supabase import create_client
-from glassdoor_scraper import get_glassdoor_data
-from glassdoor_wayback import get_historical_rating
 
 url = st.secrets["supabase"]["url"]
 key = st.secrets["supabase"]["key"]
